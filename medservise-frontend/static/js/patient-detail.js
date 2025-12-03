@@ -3,7 +3,8 @@ const role = localStorage.getItem("role");
 const urlParams = new URLSearchParams(window.location.search);
 const patientId = urlParams.get("patient_id");
 
-const BASE_API_URL = "http://89.39.95.150/api/v1/";
+// 🔥 Auto-detect BASE API URL (works for any IP/domain/localhost)
+const BASE_API_URL = (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1/";
 
 // ✅ Access check
 if (!token || !patientId || !["admin", "doctor"].includes(role)) {

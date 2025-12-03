@@ -1,30 +1,57 @@
-from datetime import timedelta 
+# apps/serializers.py
+from datetime import timedelta
 from urllib.parse import urlparse
+import logging
+import os
 
 from django.db import models
-import redis
+from django.db.models import OneToOneField, CASCADE, ForeignKey
 from django.contrib.auth import authenticate
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import ValidationError
-from django.db.models import OneToOneField, CASCADE, ForeignKey
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.apps import apps as django_apps
+
+import redis
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.fields import HiddenField, CurrentUserDefault, IntegerField
 from rest_framework.serializers import ModelSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from root import settings
-from .models import User, Doctor, Patient, PatientResult, Service, TreatmentPayment, CashRegister, TurnNumber, Outcome, TreatmentRegistration
+from apps.models import (
+    User, Doctor, Patient, PatientResult, Service, TreatmentPayment,
+    CashRegister, TurnNumber, Outcome, TreatmentRegistration, Appointment,
+    Payment, TreatmentRoom, LabRegistration
+)
 
+logger = logging.getLogger(__name__)
 
-redis_url = urlparse(settings.CELERY_BROKER_URL)
+# ---------- Redis: robust init + tolerate read-only replicas ----------
+def _build_redis():
+    """
+    Prefer a writable REDIS_URL; fall back to CACHE_URL or CELERY_BROKER_URL.
+    Use decode_responses so .get() returns str.
+    """
+    url = getattr(settings, 'REDIS_URL', None) \
+          or getattr(settings, 'CACHE_URL', None) \
+          or getattr(settings, 'CELERY_BROKER_URL', None)
 
+    if not url:
+        logger.warning("No REDIS_URL/CACHE_URL/CELERY_BROKER_URL found; Redis features disabled.")
+        return None
+    try:
+        client = redis.Redis.from_url(url, decode_responses=True)
+        return client
+    except Exception as e:
+        logger.error("Failed to init Redis from URL %r: %s", url, e)
+        return None
 
-r = redis.StrictRedis(host=redis_url.hostname, port=redis_url.port, db=int(redis_url.path.lstrip('/')))
+r = _build_redis()
 
-# --------------------Register---------------------------------------------------
+# -------------------- Register / Login / Password --------------------
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
@@ -40,16 +67,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        user = User.objects.create_user(**validated_data , is_doctor=False )
-
+        user = User.objects.create_user(**validated_data, is_doctor=False)
         Patient.objects.create(user=user)
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     verification_code = serializers.CharField(write_only=True)
 
-# -----------------------------Forgot password -----------------------
 
 class ForgetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -63,8 +89,8 @@ class ForgetPasswordSerializer(serializers.Serializer):
             raise ValidationError("This email does not exist.")
         return email
 
-from django.contrib.auth.password_validation import validate_password
 
+from django.contrib.auth.password_validation import validate_password
 class ResetPasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
     confirm_password = serializers.CharField(write_only=True)
@@ -75,17 +101,11 @@ class ResetPasswordSerializer(serializers.Serializer):
         return data
 
 
-#---------------------------------User info -------------------------------
-
 class UserInfoSerializer(ModelSerializer):
-
     class Meta:
         model = User
-        fields = [
-            "first_name" , "last_name" , "email"
-        ]
+        fields = ["first_name", "last_name", "email"]
 
-# ------------------------------------Token----------------------------------
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -94,9 +114,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['email'] = user.email
         return token
 
-# -----------------------------------Login-------------------------------------
 
 class LoginUserModelSerializer(serializers.Serializer):
+    """
+    Fixed: uses Redis safely and tolerates read-only replicas so login never 500s.
+    """
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
@@ -105,20 +127,53 @@ class LoginUserModelSerializer(serializers.Serializer):
         password = attrs.get('password')
 
         redis_key = f'failed_attempts_{email}'
-        attempts = r.get(redis_key)
-        if attempts and int(attempts) >= 5:
-            raise ValidationError("Too many failed login attempts. Try again after 5 minutes.")
+        attempts = None
+
+        # Read attempts (safe even if r is None)
+        try:
+            if r is not None:
+                attempts = r.get(redis_key)
+        except Exception as e:
+            logger.warning("Redis GET failed for %s: %s", redis_key, e)
+            attempts = None
+
+        # rate-limit gate (5 attempts)
+        try:
+            if attempts and int(attempts) >= 5:
+                raise DRFValidationError("Too many failed login attempts. Try again after 5 minutes.")
+        except Exception:
+            # if attempts is malformed, ignore it
+            pass
 
         user = authenticate(email=email, password=password)
 
         if user is None:
-            current_attempts = int(attempts) if attempts else 0
-            r.setex(redis_key, timedelta(minutes=5), current_attempts + 1)
-            raise ValidationError("Invalid email or password")
+            current_attempts = 0
+            try:
+                current_attempts = int(attempts) if attempts is not None else 0
+            except Exception:
+                current_attempts = 0
 
-        r.delete(redis_key)
+            # Write back to Redis but tolerate read-only error
+            try:
+                if r is not None:
+                    r.setex(redis_key, timedelta(minutes=5), current_attempts + 1)
+            except redis.exceptions.ReadOnlyError:
+                logger.warning("Redis is read-only; cannot setex %s", redis_key)
+            except Exception as e:
+                logger.error("Redis SETEX failed for %s: %s", redis_key, e)
 
-        # ✅ Store user to use later in the view
+            raise DRFValidationError("Invalid email or password")
+
+        # Successful login → clear counter, but don't crash if read-only
+        try:
+            if r is not None:
+                r.delete(redis_key)
+        except redis.exceptions.ReadOnlyError:
+            logger.warning("Redis is read-only; skipping delete for %s", redis_key)
+        except Exception as e:
+            logger.error("Redis DELETE failed for %s: %s", redis_key, e)
+
         attrs['user'] = user
         return attrs
 
@@ -138,15 +193,11 @@ class ForgotPasswordSerializer(serializers.Serializer):
         user = User.objects.get(email=self.validated_data['email'])
         token = PasswordResetTokenGenerator().make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-
-        # Generate reset link
         reset_link = f"{request._current_scheme_host}/reset-password/{uid}/{token}/"
-
-        # Send reset email (you can adjust email settings in your project)
         user.email_user(
             subject="Password Reset Request",
             message=f"Click the link below to reset your password:\n{reset_link}",
-            from_email=None  # Use default from_email from settings
+            from_email=None
         )
 
 
@@ -160,10 +211,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             uid = urlsafe_base64_decode(data['uid']).decode()
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            raise ValidationError("Invalid UID or user does not exist.")
+            raise DRFValidationError("Invalid UID or user does not exist.")
 
         if not PasswordResetTokenGenerator().check_token(user, data['token']):
-            raise ValidationError("Invalid or expired token.")
+            raise DRFValidationError("Invalid or expired token.")
 
         self.user = user
         return data
@@ -173,23 +224,25 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         self.user.save()
 
 
+# -------------------- Domain Serializers --------------------
+class UserForDoctorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'email', 'date_of_birth', 'phone_number']
 
-# /**/*/**/*/*//*//**/*//*/**//*/*/**//*/*/*/*/*/*/**//*/*/*/*/**/*/*/*/*//*/**/
 
 # apps/serializers.py
 from rest_framework import serializers
-from .models import Patient, Doctor, Appointment, Payment, TreatmentRoom, TreatmentRegistration
-
-
-
-
+from apps.models import User, Doctor
 
 class DoctorCreateSerializer(serializers.ModelSerializer):
+    # Auth/user fields (always required)
     email = serializers.EmailField(write_only=True)
     password = serializers.CharField(write_only=True)
-    consultation_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     first_name = serializers.CharField(write_only=True)
-    last_name = serializers.CharField(write_only=True)
+    last_name  = serializers.CharField(write_only=True)
+
+    # Role selector (controls which fields are required)
     role = serializers.ChoiceField(
         choices=[
             ('doctor', 'Shifokor'),
@@ -201,8 +254,12 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
         write_only=True
     )
 
-    name = serializers.CharField(required=False)
-    specialty = serializers.CharField(required=False)
+    # Doctor-only fields (must be tolerant for non-doctor roles)
+    consultation_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    name = serializers.CharField(required=False, allow_blank=True)
+    specialty = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Doctor
@@ -211,21 +268,42 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
             'email', 'password', 'first_name', 'last_name', 'role'
         ]
 
+    def validate(self, attrs):
+        role = attrs.get("role")
+
+        # normalize blanks -> None
+        for k in ("name", "specialty"):
+            if attrs.get(k) == "":
+                attrs[k] = None
+
+        if role == "doctor":
+            # doctors must have a specialty; price defaults to 0 if missing
+            if not attrs.get("specialty"):
+                raise serializers.ValidationError({"specialty": ["This field is required for doctors."]})
+            if attrs.get("consultation_price") is None:
+                attrs["consultation_price"] = 0
+        else:
+            # non-doctor roles: strip doctor-only fields to avoid model validation
+            attrs.pop("specialty", None)
+            attrs.pop("consultation_price", None)
+            attrs.pop("name", None)
+
+        return attrs
+
     def create(self, validated_data):
         role = validated_data.pop("role")
         email = validated_data.pop("email")
         password = validated_data.pop("password")
         first_name = validated_data.pop("first_name")
-        last_name = validated_data.pop("last_name")
+        last_name  = validated_data.pop("last_name")
 
-        is_doctor = role == "doctor"
-        is_cashier = role == "cashier"
-        is_accountant = role == "accountant"
-        is_registrator = role == "registration"
-        is_superuser = role == "admin"
-        is_staff = is_superuser or is_cashier or is_accountant or is_registrator
+        is_doctor      = (role == "doctor")
+        is_cashier     = (role == "cashier")
+        is_accountant  = (role == "accountant")
+        is_registrator = (role == "registration")
+        is_superuser   = (role == "admin")
+        is_staff       = is_superuser or is_cashier or is_accountant or is_registrator
 
-        # ✅ Create user
         user = User.objects.create_user(
             email=email,
             password=password,
@@ -240,27 +318,26 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
             is_staff=is_staff,
         )
 
-        # ✅ If doctor, ensure name + specialty exist
         if is_doctor:
             name = validated_data.get("name") or f"{first_name} {last_name}"
             specialty = validated_data.get("specialty")
+            consultation_price = validated_data.get("consultation_price") or 0
+            return Doctor.objects.create(
+                user=user,
+                name=name,
+                specialty=specialty,
+                consultation_price=consultation_price
+            )
 
-            if not specialty:
-                raise serializers.ValidationError({
-                    "specialty": ["This field is required for doctors."]
-                })
-
-            validated_data["name"] = name
-            return Doctor.objects.create(user=user, **validated_data)
-
+        # non-doctor roles: return just the user
         return user
-
 
 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
-        fields = ['id', 'name', 'specialty','consultation_price']
+        fields = ['id', 'name', 'specialty', 'consultation_price']
+
 
 class ServiceSerializer(serializers.ModelSerializer):
     doctor = DoctorSerializer(read_only=True)
@@ -270,19 +347,6 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
         fields = ['id', 'name', 'price', 'doctor', 'doctor_id']
 
-    def get_doctor(self, obj):
-        return {
-            "id": obj.doctor.id,
-            "name": obj.doctor.user.get_full_name()
-        }
-
-
-class UserForDoctorSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'date_of_birth', 'phone_number']
-
-
 
 class DoctorDetailSerializer(serializers.ModelSerializer):
     user = UserForDoctorSerializer()
@@ -290,7 +354,8 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Doctor
-        fields = ['id', 'user', 'specialty',  'consultation_price']
+        fields = ['id', 'user', 'specialty', 'consultation_price']
+
 
 class PatientSerializer(serializers.ModelSerializer):
     balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
@@ -305,7 +370,6 @@ class PatientSerializer(serializers.ModelSerializer):
             'id', 'first_name', 'last_name', 'phone', 'address', 'created_at',
             'patients_doctor', 'balance', 'last_visit', 'total_due', 'total_paid'
         ]
-
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -325,10 +389,12 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = '__all__'
 
+
 class TreatmentPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = TreatmentPayment
         fields = "__all__"
+
 
 class TreatmentRoomSerializer(serializers.ModelSerializer):
     patients = serializers.SerializerMethodField()
@@ -338,36 +404,53 @@ class TreatmentRoomSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_patients(self, obj):
-        active_regs = obj.treatmentregistration_set.filter(discharged_at__isnull=True)
-        return [
-            {
-                "id": reg.patient.id,
-                "registration_id": reg.id,  # ✅ Include this
-                "first_name": reg.patient.first_name,
-                "last_name": reg.patient.last_name
-            } for reg in active_regs
-        ]
+        active_regs = obj.treatmentregistration_set.filter(discharged_at__isnull=True).select_related('patient')
+        out = []
+        for reg in active_regs:
+            p = reg.patient
+            if not p:
+                continue
+            first = (p.first_name or '').strip()
+            last  = (p.last_name  or '').strip()
+            full  = f"{first} {last}".strip() or "—"
+            out.append({
+                "id": p.id,
+                "registration_id": reg.id,
+                "first_name": first,
+                "last_name": last,
+                "full_name": full,   # existing
+                # new common aliases that many UIs use:
+                "name": full,
+                "fullName": full,
+                "patient_name": full,
+            })
+        return out
 
+
+# ---------------- TreatmentRegistration ----------------
 class TreatmentRegistrationSerializer(serializers.ModelSerializer):
+    # 🔹 Return nested patient (JS calls nameOf(x.patient))
+    patient = PatientSerializer(read_only=True)
+
+    # 🔹 Provide a simple room name alias (JS looks for x.room.name OR x.room_name OR x.treatment_room)
+    room_name = serializers.CharField(source='room.name', read_only=True)
+
+    # (keep appointment if you need it elsewhere)
     appointment = AppointmentSerializer(read_only=True)
-    treatment_room = TreatmentRoomSerializer(read_only=True)
-    total_paid = serializers.SerializerMethodField()
-    amount_due = serializers.SerializerMethodField()
 
     class Meta:
         model = TreatmentRegistration
-        fields = '__all__'
+        fields = [
+            'id', 'patient', 'room', 'room_name', 'appointment',
+            'assigned_at', 'discharged_at', 'total_paid'
+        ]
 
-    def get_total_paid(self, obj):
-        return obj.total_paid()
-
-    def get_amount_due(self, obj):
-        return obj.amount_due()
 
 class AppointmentStatusUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = ['status']
+
 
 class PatientResultSerializer(serializers.ModelSerializer):
     class Meta:
@@ -403,7 +486,6 @@ class DoctorUserCreateSerializer(serializers.Serializer):
         is_superuser = role == "admin"
         is_staff = is_superuser or is_cashier or is_accountant or is_registrator
 
-        # Create User
         user = User.objects.create_user(
             email=validated_data["email"],
             password=validated_data["password"],
@@ -420,7 +502,6 @@ class DoctorUserCreateSerializer(serializers.Serializer):
             is_staff=is_staff,
         )
 
-        # Create Doctor model only for doctors
         if is_doctor:
             return Doctor.objects.create(
                 user=user,
@@ -429,7 +510,6 @@ class DoctorUserCreateSerializer(serializers.Serializer):
             )
 
         return user
-
 
 
 class RoomStatusSerializer(serializers.Serializer):
@@ -442,10 +522,8 @@ class RoomStatusSerializer(serializers.Serializer):
 class DoctorPaymentSerializer(serializers.ModelSerializer):
     patient_first_name = serializers.CharField(source='patient.first_name', read_only=True)
     patient_last_name = serializers.CharField(source='patient.last_name', read_only=True)
-
     doctor_first_name = serializers.CharField(source='patient.patients_doctor.user.first_name', read_only=True)
     doctor_last_name = serializers.CharField(source='patient.patients_doctor.user.last_name', read_only=True)
-
     amount_paid = serializers.DecimalField(source='amount', max_digits=10, decimal_places=2, read_only=True)
     created_at = serializers.DateTimeField(source='date', read_only=True)
     notes = serializers.CharField(required=False)
@@ -463,8 +541,6 @@ class DoctorPaymentSerializer(serializers.ModelSerializer):
             'created_at',
             'notes',
         ]
-
-
 
 
 class CashRegisterSerializer(serializers.ModelSerializer):
@@ -495,20 +571,16 @@ class CashRegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         service_ids = validated_data.pop("service_ids", [])
-        services = []
-
-        # ✅ ensure patient is present
-        patient = validated_data.get('patient')
-        if not patient:
-            raise serializers.ValidationError({"patient": "This field is required."})
-
         if validated_data.get('transaction_type') == 'service' and service_ids:
             services = list(Service.objects.filter(id__in=service_ids))
             if len(services) != len(service_ids):
                 raise serializers.ValidationError({"service_ids": "One or more service IDs are invalid"})
-
             names = ", ".join(s.name for s in services)
             validated_data["notes"] = f"Service Payment: {names}"
+
+        patient = validated_data.get('patient')
+        if not patient:
+            raise serializers.ValidationError({"patient": "This field is required."})
 
         return super().create(validated_data)
 
@@ -517,8 +589,6 @@ class CashRegisterSerializer(serializers.ModelSerializer):
             names = obj.notes.replace("Service Payment:", "").strip()
             return [name.strip() for name in names.split(",")]
         return []
-
-
 
 
 class CallTurnSerializer(serializers.Serializer):
@@ -535,7 +605,6 @@ class TreatmentRegistrationUpdateSerializer(serializers.ModelSerializer):
         fields = ['room']
 
 
-
 class TurnNumberSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.user.get_full_name', read_only=True)
 
@@ -543,7 +612,7 @@ class TurnNumberSerializer(serializers.ModelSerializer):
         model = TurnNumber
         fields = ['doctor', 'doctor_name', 'letter', 'last_number', 'last_reset']
 
-# serializers.py
+
 class TreatmentRoomPaymentReceiptSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
     processed_by = serializers.SerializerMethodField()
@@ -576,7 +645,7 @@ class TreatmentRoomPaymentReceiptSerializer(serializers.ModelSerializer):
         return obj.created_at.strftime("%Y-%m-%d %H:%M")
 
     def get_receipt_number(self, obj):
-        return f"TR{obj.id:04}"  # Example: TR0005
+        return f"TR{obj.id:04}"
 
     def get_transaction_type(self, obj):
         return "Davolash xonasi"
@@ -589,12 +658,10 @@ class OutcomeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-from apps.models import User  # adjust if your model is in a different location
-
 class UserProfileSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
-    full_name = serializers.SerializerMethodField()  # Optional
+    full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -602,7 +669,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'first_name', 'last_name', 'email',
             'is_superuser', 'is_doctor', 'is_cashier',
             'is_accountant', 'is_registrator',
-            'role', 'is_admin', 'full_name'  # include full_name if desired
+            'role', 'is_admin', 'full_name'
         ]
 
     def get_role(self, obj):
@@ -625,24 +692,65 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}".strip()
 
 
-
-
-
 class RoomHistorySerializer(serializers.ModelSerializer):
-    room_name = serializers.CharField(source='room.name', read_only=True)  # Derive room_name from room
+    room_name = serializers.CharField(source='room.name', read_only=True)
 
     class Meta:
         model = TreatmentRegistration
         fields = ['id', 'room_name', 'assigned_at', 'discharged_at']
 
 
+# ----------------------------- ✅ FIXED: LabRegistration serializer -----------------------------
+# Detect presence of optional FK at import-time
+_LabReg = django_apps.get_model('apps', 'LabRegistration')
+_LAB_FIELDS = {f.name for f in _LabReg._meta.get_fields()}
+_HAS_ASSIGNED = 'assigned_doctor' in _LAB_FIELDS
 
-class PaymentSerializer(serializers.ModelSerializer):
+# ---------------- LabRegistration ----------------
+from django.apps import apps as django_apps
+from rest_framework import serializers
+from apps.models import LabRegistration
+# PatientSerializer is already defined above in your file
+
+_LabReg = django_apps.get_model('apps', 'LabRegistration')
+_HAS_ASSIGNED = any(f.name == 'assigned_doctor' for f in _LabReg._meta.get_fields())
+
+class LabRegistrationSerializer(serializers.ModelSerializer):
+    # 🔹 Return the whole patient object so nameOf(x.patient) works
+    patient = PatientSerializer(read_only=True)
+
+    # convenience fields used by the modal text
+    service_name = serializers.CharField(source='service.name', read_only=True)
+    assigned_doctor_name = serializers.SerializerMethodField(read_only=True)
+    repeat_count = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
-        model = Payment
-        fields = ['id', 'amount', 'created_at']
+        model = LabRegistration
+        base = ['id', 'patient', 'service', 'status', 'created_at',
+                'service_name', 'assigned_doctor_name', 'repeat_count']
+        fields = (['assigned_doctor'] + base) if _HAS_ASSIGNED else base
+
+    def get_assigned_doctor_name(self, obj):
+        # prefer assigned_doctor if your model has it
+        if _HAS_ASSIGNED and getattr(obj, 'assigned_doctor', None):
+            d = obj.assigned_doctor
+            return getattr(d, 'name', None) or f"{getattr(d,'first_name','')} {getattr(d,'last_name','')}".strip() or None
+        # otherwise try via visit -> appointment -> doctor
+        v = getattr(obj, 'visit', None)
+        if v and getattr(v, 'appointment', None) and v.appointment.doctor:
+            d = v.appointment.doctor
+            return getattr(d, 'name', None) or f"{getattr(d,'first_name','')} {getattr(d,'last_name','')}".strip() or None
+        return None
+
+    def get_repeat_count(self, obj):
+        try:
+            return LabRegistration.objects.filter(patient=obj.patient, service=obj.service).count()
+        except Exception:
+            return None
+
 
 from apps.models import Patient, Appointment, TreatmentRegistration, LabRegistration, TreatmentPayment
+from django.db import models
 
 class PatientArchiveSerializer(serializers.ModelSerializer):
     appointments = serializers.SerializerMethodField()
@@ -706,51 +814,3 @@ class PatientArchiveSerializer(serializers.ModelSerializer):
     def get_total_payments(self, obj):
         total = TreatmentPayment.objects.filter(patient=obj).aggregate(total=models.Sum('amount'))['total'] or 0
         return str(total)
-
-
-class LabRegistrationSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    service_name = serializers.ReadOnlyField(source='service.name')
-    doctor_name = serializers.ReadOnlyField(source='service.doctor.name')
-    created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
-    visit_data = serializers.SerializerMethodField(read_only=True)
-    status = serializers.ChoiceField(choices=LabRegistration.STATUS_CHOICES, default="pending")
-
-    class Meta:
-        model = LabRegistration
-        fields = [
-            'id',
-            'patient',
-            'visit',
-            'service',
-            'patient_name',
-            'service_name',
-            'doctor_name',
-            'created_at',
-            'status',
-            'notes',
-            'repeat_count', 'visit_data'
-        ]
-        read_only_fields = ['created_at', 'patient_name', 'service_name', 'doctor_name', 'visit_data']
-
-    def get_patient_name(self, obj):
-        return f"{obj.patient.first_name} {obj.patient.last_name}"
-
-    def get_visit_data(self, obj):
-        if obj.visit:
-            return {
-                'id': obj.visit.id,
-                'room': obj.visit.room.name if obj.visit.room else None,
-                'assigned_at': obj.visit.assigned_at.strftime('%Y-%m-%d %H:%M') if obj.visit.assigned_at else None
-            }
-        return None
-
-    def validate(self, data):
-        visit_id = data.get('visit')
-        if not visit_id:
-            raise serializers.ValidationError({"visit": "This field is required."})
-        try:
-            TreatmentRegistration.objects.get(id=visit_id)
-        except TreatmentRegistration.DoesNotExist:
-            raise serializers.ValidationError({"visit": "Invalid visit ID."})
-        return data

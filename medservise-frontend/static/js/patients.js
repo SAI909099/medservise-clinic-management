@@ -1,7 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
-  const BASE_API = "http://89.39.95.150/api/v1/";
+
+  // 🔥 Dynamic API base — works on any server/ip
+  const BASE_API =
+    (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1/";
 
   if (!token || !["admin", "doctor", "registration"].includes(role)) {
     alert("Iltimos, tizimga kiring.");

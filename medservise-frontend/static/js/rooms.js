@@ -1,8 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("token");
 
+  // ✅ Dynamic API base (no more hardcoded IP)
+  const BASE_API =
+    (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1/";
+
   function loadRooms() {
-    fetch("http://89.39.95.150/api/v1/treatment-rooms/", {
+    fetch(`${BASE_API}treatment-rooms/`, {
       headers: {
         "Authorization": `Bearer ${token}`
       }
@@ -34,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const name = document.getElementById("room-name").value;
     const capacity = document.getElementById("room-capacity").value;
 
-    fetch("http://89.39.95.150/api/v1/treatment-rooms/", {
+    fetch(`${BASE_API}treatment-rooms/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

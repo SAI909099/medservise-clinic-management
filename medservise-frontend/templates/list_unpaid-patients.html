@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>Qarzdor bemorlar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{background:#f8f9fa}
+    .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+    .table thead th{background:#f3f4f6;white-space:nowrap}
+    .badge-due{background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2}
+    .badge-ok{background:#e8f5e9;color:#1b5e20;border:1px solid #c8e6c9}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h1 class="h4 m-0">💳 Qarzdor bemorlar</h1>
+      <div class="d-flex gap-2">
+        <a href="/patient-balances/" class="btn btn-outline-secondary">🧾 Barcha hisoblar</a>
+        <a href="/treatment-room-management" class="btn btn-outline-secondary">🛏️ Xona boshqaruvi</a>
+      </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-5">
+          <input id="unpaidSearch" class="form-control" placeholder="Ism, familiya yoki telefon bo‘yicha qidirish">
+        </div>
+        <div class="col-md-3">
+          <select id="unpaidLimit" class="form-select">
+            <option value="50">50 ta</option>
+            <option value="100" selected>100 ta</option>
+            <option value="200">200 ta</option>
+          </select>
+        </div>
+        <div class="col-md-4 text-md-end">
+          <small class="text-muted" id="unpaidCount">—</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="unpaidTable">
+          <thead>
+            <tr>
+              <th style="width:56px">#</th>
+              <th>Bemor</th>
+              <th>Shifokor</th>
+              <th class="text-end">Hisoblangan</th>
+              <th class="text-end">To‘langan</th>
+              <th class="text-end">Qoldiq</th>
+              <th style="width:160px">Amal</th>
+            </tr>
+          </thead>
+          <tbody id="unpaidTbody">
+            <tr><td colspan="7" class="text-muted">Yuklanmoqda…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-between align-items-center p-2 border-top">
+        <div>
+          <button class="btn btn-sm btn-outline-secondary" id="prevBtn">← Oldingi</button>
+          <button class="btn btn-sm btn-outline-secondary" id="nextBtn">Keyingi →</button>
+        </div>
+        <small class="text-muted" id="pageInfo">1-sahifa</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt Modal -->
+  <div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Bemor hisobot</h5>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" id="printReceiptBtn">🖨 Chop etish</button>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+          </div>
+        </div>
+        <div class="modal-body" id="receiptModalBody">
+          <div class="text-muted">Yuklanmoqda…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <link rel="icon" href="/static/favicon.ico">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/list_unpaid-patients.js?v=3" defer></script>
+
+</body>
+</html>

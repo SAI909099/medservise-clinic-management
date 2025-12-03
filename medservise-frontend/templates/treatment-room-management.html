@@ -1,45 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="uz">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🛏️ Yotoqxona boshqaruvi - Controllab</title>
+  <meta charset="utf-8" />
+  <title>Controllab — Davolanish xonalarini boshqarish</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+
   <style>
-    body {
-      display: flex;
-      min-height: 100vh;
-      margin: 0;
-    }
-    .sidebar {
-      width: 250px;
-      background-color: #f8f9fa;
-      padding-top: 20px;
-      border-right: 1px solid #dee2e6;
-    }
-    .sidebar a {
-      display: block;
-      padding: 10px 20px;
-      color: #333;
-      text-decoration: none;
-    }
-    .sidebar a:hover {
-      background-color: #e9ecef;
-    }
-    .main-content {
-      flex-grow: 1;
-      padding: 30px;
-      background-color: #f8f9fa;
-    }
-    .card-toggle {
-      cursor: pointer;
-    }
-    .card-body {
-      display: none;
-    }
-    .card.open .card-body {
-      display: block;
-    }
+    body { background:#f8f9fa; display:flex; min-height:100vh; margin:0; }
+    .wrap { max-width:1200px; margin:24px auto; padding:0 16px; flex-grow:1; }
+    .table thead th { background:#f3f4f6; }
+    .w-14 { width:14rem; }
+    .sidebar { width:250px; background-color:#fff; padding-top:20px; border-right:1px solid #dee2e6; flex-shrink:0; }
+    .sidebar a { display:block; padding:10px 20px; color:#333; text-decoration:none; }
+    .sidebar a:hover { background:#e9ecef; }
+    .card ul { padding-left:18px; }
   </style>
 </head>
 <body>
@@ -47,15 +22,17 @@
 <!-- Sidebar -->
 <div class="sidebar">
   <h5 class="text-center">🩺 Controllab</h5>
-  <a href="/registration" class="d-block py-1 ps-3">🏥 Bemorni ro'yxatdan o'tkazish</a>
+  <a href="/registration">🏥 Bemorni ro'yxatdan o'tkazish</a>
+
   <div class="accordion" id="treatmentRoomAccordion">
     <div class="accordion-item border-0">
       <h2 class="accordion-header">
-        <button class="accordion-button collapsed px-3 py-2 bg-transparent shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#treatmentRoomCollapse">
+        <button class="accordion-button collapsed px-3 py-2 bg-transparent shadow-none" type="button"
+                data-bs-toggle="collapse" data-bs-target="#treatmentRoomCollapse" aria-expanded="false">
           🛏️ Yotoqxona
         </button>
       </h2>
-      <div id="treatmentRoomCollapse" class="accordion-collapse collapse">
+      <div id="treatmentRoomCollapse" class="accordion-collapse collapse" data-bs-parent="#treatmentRoomAccordion">
         <div class="accordion-body py-1 px-3">
           <a href="/treatment-registration" class="d-block py-1 ps-3">• Bemorni joylashtirish</a>
           <a href="/treatment-room-management" class="d-block py-1 ps-3">• Yotoqxona boshqaruvi</a>
@@ -63,64 +40,150 @@
       </div>
     </div>
   </div>
-  <a href="/turn-display">📢 Navbat ekran</a>
-  <a href="#" onclick="logout()" class="text-danger ps-3 mt-2 d-block">🚪 Chiqish</a>
+  <li class="nav-item"> <a href="/list_unpaid-patients/" class="nav-link text-black" >To‘lanmagan bemorlar</a></li>
+  <a href="/patient-balances/" class="d-block py-1 ps-3">🧾 Bemor Hisoblari</a>
+  <a href="/turn-display" class="d-block py-1 ps-3">📢 Navbat displeyi</a>
 </div>
 
-<!-- Main Content -->
-<div class="main-content">
-  <div class="container-fluid">
-    <h2 class="mb-4">🛏️ Yotoqxona boshqaruvi</h2>
-    <div id="room-list" class="accordion" role="tablist"></div>
+<!-- Main content -->
+<div class="wrap">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 m-0">Controllab — Davolanish xonalarini boshqarish</h1>
+    <div class="d-flex gap-2">
+      <a href="/treatment-room-payments/" class="btn btn-outline-secondary">To‘lovlar</a>
+      <button class="btn btn-outline-danger" onclick="localStorage.removeItem('token');location.href='/'">Chiqish</button>
+    </div>
+  </div>
+
+  <!-- Patients in rooms -->
+  <div class="card mb-4">
+    <div class="table-responsive">
+      <table id="rooms-table" class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:56px">#</th>
+            <th class="w-14">Bemor</th>
+            <th class="w-14">Xona</th>
+            <th>Holat</th>
+            <th style="width:520px">Amal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="5" class="text-muted">Yuklanmoqda…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Lab referrals -->
+  <div class="card">
+    <div class="card-header">🧪 Lab yo‘llanmalari</div>
+    <div class="table-responsive">
+      <table id="lab-table" class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Bemor</th>
+            <th>Xizmat</th>
+            <th>Shifokor</th>
+            <th>Holat</th>
+            <th>Vaqt</th>
+            <th>Amal</th> <!-- cancel button column -->
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="7" class="text-muted">Yuklanmoqda…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<!-- Move Patient Modal -->
-<div class="modal fade" id="movePatientModal" tabindex="-1" aria-labelledby="moveModalLabel" aria-hidden="true">
+<!-- Lab modal -->
+<div class="modal fade" id="labSendModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <div class="modal-content">
+    <form class="modal-content" onsubmit="return false;">
       <div class="modal-header">
-        <h5 class="modal-title" id="moveModalLabel">Bemorni boshqa xonaga ko‘chirish</h5>
+        <h5 class="modal-title">🧪 Labga yuborish</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
       </div>
       <div class="modal-body">
-        <select id="roomSelect" class="form-select">
-          <option value="">-- Yangi xonani tanlang --</option>
-        </select>
+        <div class="mb-3">
+          <label class="form-label">Bemor</label>
+          <input id="labPatientName" class="form-control" disabled />
+          <input id="labPatientId" type="hidden" />
+        </div>
+
+        <!-- multi-select services with prices and total -->
+        <div class="mb-3">
+          <label class="form-label">Xizmatlar</label>
+          <div id="labServiceList" class="border rounded p-2" style="max-height:260px; overflow:auto;">
+            <div class="text-muted small">Yuklanmoqda…</div>
+          </div>
+          <div class="d-flex justify-content-between mt-2">
+            <div class="small text-muted">Xizmatga ulangan shifokorga avtomatik biriktiriladi.</div>
+            <div><strong>Jami:</strong> <span id="labTotal">0</span> so’m</div>
+          </div>
+        </div>
+
+        <div class="alert alert-info d-none" id="labAssignedInfo"></div>
       </div>
       <div class="modal-footer">
-        <button id="confirmMoveBtn" class="btn btn-primary">Ko‘chirishni tasdiqlash</button>
+        <button id="sendLabBtn" class="btn btn-primary">Yuborish</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Bekor qilish</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Move modal -->
+<div class="modal fade" id="moveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" onsubmit="return false;">
+      <div class="modal-header">
+        <h5 class="modal-title">🏠 Bemorni boshqa xonaga ko‘chirish</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="moveRegId" />
+        <div class="mb-3">
+          <label class="form-label">Yangi xona</label>
+          <select id="moveRoomSelect" class="form-select"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="moveConfirmBtn" class="btn btn-primary">Ko‘chirish</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Bekor qilish</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- NEW: Patient receipt modal (same as unpaid page) -->
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Bemor hisobot</h5>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" id="printReceiptBtn">🖨 Chop etish</button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+        </div>
+      </div>
+      <div class="modal-body" id="receiptModalBody">
+        <div class="text-muted">Yuklanmoqda…</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Lab Modal -->
-<div class="modal fade" id="labModal" tabindex="-1" aria-labelledby="labModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="labModalLabel">🔬 Tahlil tayinlash</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
-      </div>
-      <div class="modal-body">
-        <select id="labServiceSelect" class="form-select mb-2">
-          <option value="">-- Tahlilni tanlang --</option>
-        </select>
-        <textarea id="labNotes" class="form-control" placeholder="Izoh (ixtiyoriy)"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button id="submitLabBtn" class="btn btn-success">✅ Yuborish</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Polyfills for old/mobile browsers -->
+<script>(function(){if(!window.Promise){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js';document.head.appendChild(s);}if(!window.fetch){var f=document.createElement('script');f.src='https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.20/dist/fetch.umd.js';document.head.appendChild(f);}})();</script>
 
-
-
-
-<!-- External JS -->
+<!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/js/treatment-room-management.js"></script>
+<!-- updated to JS that opens the receipt on "Tafsilot" -->
+<script src="/static/js/treatment-room-management.js?v=trm9" defer></script>
+
 </body>
 </html>

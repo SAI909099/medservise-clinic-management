@@ -1,8 +1,18 @@
 # ✅ FIXED urls.py
 from django.urls import path
+from django.views.generic import TemplateView
 
-from apps.frontend_views import UserProfileView
-from apps.models import CallTurnView
+from apps.views import UnpaidPatientsDataView  # add this import
+from apps.views import AdminResetDoctorPasswordView  # ADD THIS IMPORT
+
+
+# If you don't actually use this in urls, you can remove it.
+# from apps.frontend_views import UserProfileView
+
+# Alias so your frontend can call /api/v1/token/refresh/
+from rest_framework_simplejwt.views import TokenRefreshView
+
+# Use the CallTurnView defined in apps.views (not the one in models)
 from apps.views import (
     # Auth
     RegisterAPIView, VerifyEmailAPIView, LoginAPIView, UserInfoListCreateAPIView,
@@ -39,8 +49,11 @@ from apps.views import (
     TreatmentDischargeView, TreatmentMoveView, DoctorPatientRoomView, GenerateTurnView, CallPatientView,
     CurrentCallsView, PrintTurnView, ClearCallView, AdminStatisticsView, RecentTransactionsView, AdminChartDataView,
     TreatmentPaymentReceiptView, PrintTreatmentReceiptView, PrintTreatmentRoomReceiptView, TreatmentRoomStatsView,
-    AccountantDashboardView, OutcomeListCreateView, UserProfileAPIView , UserProfileAPIView,     LabRegistrationListCreateAPIView,
-    LabRegistrationDetailAPIView , PublicDoctorServiceAPI , PatientArchiveView, RoomHistoryView
+    AccountantDashboardView, OutcomeListCreateView, UserProfileAPIView,
+    LabRegistrationListCreateAPIView, LabRegistrationDetailAPIView, PublicDoctorServiceAPI,
+    PatientArchiveView, RoomHistoryView, PatientBalancesAPIView, PatientBillingAPIView, PatientBillingReceiptHTMLView,
+    DischargeReceiptHTMLView, DischargeReceiptAPIView, PatientBalancesDataView,
+    CallTurnView,  # ← use the view from apps.views
 )
 
 urlpatterns = [
@@ -50,6 +63,9 @@ urlpatterns = [
     path('login/', LoginAPIView.as_view(), name='login'),
     path('reset-password/', PasswordResetConfirmView.as_view(), name='reset-password'),
     path('activate/<uidb64>/<token>', ActivateUserView.as_view(), name='activate'),
+
+    # JWT refresh under /api/v1/ to match your frontend
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh_v1'),
 
     # --- User Info ---
     path('user-detail/', UserInfoListCreateAPIView.as_view(), name='user-detail'),
@@ -100,43 +116,34 @@ urlpatterns = [
     path('cash-registration/patients/', CashRegistrationListView.as_view(), name='cash-registration-patients'),
     path('cash-register/patient/<int:patient_id>/', CashRegistrationView.as_view(), name='cash-register-by-patient'),
     path('cash-register/receipt/<int:pk>/', CashRegisterReceiptView.as_view(), name='cash-register-receipt'),
+    # 🔧 FIXED: allow POST at /api/v1/cash-register/
     path('cash-register/', CashRegisterListCreateAPIView.as_view(), name='cash-register'),
-
-    path('recent-patients/', RecentPatientsView.as_view(), name='recent-patients'),
 
     # --- Treatment Registration: Discharge & Move ---
     path('treatment-registrations/', TreatmentRegistrationListCreateView.as_view(), name='treatment-registration-list-create'),
-
-
-
     path("discharge-patient/<int:pk>/", TreatmentDischargeView.as_view(), name="discharge-patient"),
     path("move-patient-room/<int:pk>/", TreatmentMoveView.as_view(), name="move-patient"),
-
     path("doctor/my-patient-rooms/", DoctorPatientRoomView.as_view(), name="doctor-my-patient-rooms"),
 
     path("generate-turn/", GenerateTurnView.as_view(), name="generate-turn"),
     path("call-turn/", CallTurnView.as_view(), name="call-turn"),
-
     path("call-patient/<int:appointment_id>/", CallPatientView.as_view(), name="call-patient"),
     path("current-calls/", CurrentCallsView.as_view(), name="current-calls"),
     path("print-turn/", PrintTurnView.as_view()),
     path("clear-call/<int:appointment_id>/", ClearCallView.as_view()),
 
-
     path('admin-statistics/', AdminStatisticsView.as_view(), name='admin-statistics'),
     path('recent-transactions/', RecentTransactionsView.as_view(), name='recent-transactions'),
-
     path('admin-chart-data/', AdminChartDataView.as_view(), name='admin-chart-data'),
     path("treatment-room-payments/receipt/<int:id>/", TreatmentPaymentReceiptView.as_view()),
     path("treatment-room-payments/print/", PrintTreatmentReceiptView.as_view(), name="treatment-room-print"),
-    path("treatment-room-payments/room-print/", PrintTreatmentRoomReceiptView.as_view(),name="treatment-room-direct-print"),
+    path("treatment-room-payments/room-print/", PrintTreatmentRoomReceiptView.as_view(), name="treatment-room-direct-print"),
     path("admin/treatment-room-stats/", TreatmentRoomStatsView.as_view()),
 
     path("accounting-dashboard/", AccountantDashboardView.as_view(), name="accounting-dashboard"),
-    path("incomes/", AccountantDashboardView.as_view(), name="income-list"),  # alias
-    path("doctor-income/", AccountantDashboardView.as_view(), name="doctor-income"),  # alias
+    path("incomes/", AccountantDashboardView.as_view(), name="income-list"),
+    path("doctor-income/", AccountantDashboardView.as_view(), name="doctor-income"),
     path("accountant/outcomes/", OutcomeListCreateView.as_view(), name="outcome-list-create"),
-
 
     path('user-profile/', UserProfileAPIView.as_view(), name='user-profile'),
     path("receipt-details/<int:id>/", TreatmentPaymentReceiptView.as_view()),
@@ -149,5 +156,26 @@ urlpatterns = [
     path('patients/archive/', PatientArchiveView.as_view(), name='patient-archive'),
     path('room-history/', RoomHistoryView.as_view(), name='room-history'),
 
+    path('treatment-registrations/<int:pk>/receipt/', DischargeReceiptHTMLView.as_view(), name='discharge-receipt'),
+    path("discharge-patient/<int:pk>/receipt/", DischargeReceiptAPIView.as_view(), name="discharge-receipt-api"),
+
+    # page
+    path('patient-balances/', TemplateView.as_view(template_name='patient-balances.html'),
+         name='patient-balances-page'),
+
+    # --- APIs ---
+    path('patient-billing/<int:patient_id>/', PatientBillingAPIView.as_view(), name='patient-billing-data'),
+    path('patient-billing/<int:patient_id>/print/', PatientBillingReceiptHTMLView.as_view(), name='patient-billing-print'),
+
+    # New balances data API
+    path('patient-balances/data/', PatientBalancesDataView.as_view(), name='patient-balances-data'),
+       path('unpaid-patients/', TemplateView.as_view(template_name='unpaid-patients.html'),
+         name='unpaid-patients-page'),
+
+    # API
+    path('unpaid-patients/data/', UnpaidPatientsDataView.as_view(),
+         name='unpaid-patients-data'),
+
+    path('doctors/<int:pk>/reset-password/', AdminResetDoctorPasswordView.as_view(), name='doctor-reset-password'),
 
 ]

@@ -6,7 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  const API = "http://89.39.95.150/api/v1/";
+  // === FIXED: Dynamic API base ===
+  const API =
+    (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1/";
   const headers = { Authorization: `Bearer ${token}` };
 
   const doctorSelect = document.getElementById("doctor-select");
@@ -43,12 +45,18 @@ document.addEventListener("DOMContentLoaded", () => {
         twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
         const minTime = twoDaysAgo.getTime();
 
-        let filtered = patients.filter(p => new Date(p.created_at).getTime() >= minTime);
+        let filtered = patients.filter(
+          p => new Date(p.created_at).getTime() >= minTime
+        );
+
         if (doctorId) {
-          filtered = filtered.filter(p => p.patients_doctor?.id === parseInt(doctorId));
+          filtered = filtered.filter(
+            p => p.patients_doctor?.id === parseInt(doctorId)
+          );
         }
 
-        patientSelect.innerHTML = '<option disabled selected>Bemorni tanlang</option>';
+        patientSelect.innerHTML =
+          '<option disabled selected>Bemorni tanlang</option>';
         filtered.forEach(p => {
           const opt = document.createElement("option");
           opt.value = p.id;
@@ -67,7 +75,8 @@ document.addEventListener("DOMContentLoaded", () => {
     fetch(`${API}treatment-rooms/`, { headers })
       .then(res => res.json())
       .then(rooms => {
-        roomSelect.innerHTML = '<option disabled selected>Yotoqxonani tanlang</option>';
+        roomSelect.innerHTML =
+          '<option disabled selected>Yotoqxonani tanlang</option>';
         roomGrid.innerHTML = "";
 
         const floors = {};
@@ -81,45 +90,52 @@ document.addEventListener("DOMContentLoaded", () => {
           roomSelect.appendChild(opt);
         });
 
-        Object.keys(floors).sort().forEach(floor => {
-          const floorHeader = document.createElement("h4");
-          floorHeader.textContent = `🧱 ${floor}-Blok`;
-          roomGrid.appendChild(floorHeader);
+        Object.keys(floors)
+          .sort()
+          .forEach(floor => {
+            const floorHeader = document.createElement("h4");
+            floorHeader.textContent = `🧱 ${floor}-Blok`;
+            roomGrid.appendChild(floorHeader);
 
-          const row = document.createElement("div");
-          row.className = "d-flex flex-wrap gap-3 mb-4";
+            const row = document.createElement("div");
+            row.className = "d-flex flex-wrap gap-3 mb-4";
 
-          floors[floor].forEach(room => {
-            const patients = room.patients || [];
-            const status = patients.length === 0
-              ? { text: "✅ Bo'sh", class: "bg-success" }
-              : patients.length < room.capacity
-              ? { text: "🟡 Qisman band", class: "bg-warning" }
-              : { text: "🚫 To‘la", class: "bg-danger" };
+            floors[floor].forEach(room => {
+              const patients = room.patients || [];
+              const status =
+                patients.length === 0
+                  ? { text: "✅ Bo'sh", class: "bg-success" }
+                  : patients.length < room.capacity
+                  ? { text: "🟡 Qisman band", class: "bg-warning" }
+                  : { text: "🚫 To‘la", class: "bg-danger" };
 
-            const div = document.createElement("div");
-            div.className = `card p-3 text-white ${status.class}`;
-            div.style.width = "250px";
+              const div = document.createElement("div");
+              div.className = `card p-3 text-white ${status.class}`;
+              div.style.width = "250px";
 
-            let occupancyHTML = "<ul>";
-            for (let i = 0; i < room.capacity; i++) {
-              const patient = patients[i];
-              occupancyHTML += `<li>${patient ? patient.first_name + " " + patient.last_name : "<i>Bo'sh</i>"}</li>`;
-            }
-            occupancyHTML += "</ul>";
+              let occupancyHTML = "<ul>";
+              for (let i = 0; i < room.capacity; i++) {
+                const patient = patients[i];
+                occupancyHTML += `<li>${
+                  patient
+                    ? patient.first_name + " " + patient.last_name
+                    : "<i>Bo'sh</i>"
+                }</li>`;
+              }
+              occupancyHTML += "</ul>";
 
-            div.innerHTML = `
-              <h5>${room.name}</h5>
-              <p><strong>Blok:</strong> ${room.floor}</p>
-              <p><strong>Sig‘imi:</strong> ${room.capacity}</p>
-              ${occupancyHTML}
-              <p><strong>Status:</strong> ${status.text}</p>
-            `;
-            row.appendChild(div);
+              div.innerHTML = `
+                <h5>${room.name}</h5>
+                <p><strong>Blok:</strong> ${room.floor}</p>
+                <p><strong>Sig‘imi:</strong> ${room.capacity}</p>
+                ${occupancyHTML}
+                <p><strong>Status:</strong> ${status.text}</p>
+              `;
+              row.appendChild(div);
+            });
+
+            roomGrid.appendChild(row);
           });
-
-          roomGrid.appendChild(row);
-        });
       })
       .catch(err => {
         console.error("❌ Xonalar yuklanmadi:", err);
@@ -138,10 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     fetch(`${API}assign-patient-to-room/`, {
       method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json"
-      },
+      headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ patient_id: patientId, room_id: roomId })
     })
       .then(res => {

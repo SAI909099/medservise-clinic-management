@@ -1,4 +1,5 @@
-const API_BASE = "http://89.39.95.150/api/v1";
+// 🔥 FIXED — dynamically use your current domain/IP
+const API_BASE = window.location.origin + "/api/v1";
 
 let doctorChart = null;
 let serviceChart = null;
@@ -197,7 +198,7 @@ function authHeader() {
   };
 }
 
-// ✅ Filter form listener
+// Filter listener
 const filterForm = document.getElementById('filter-form');
 if (filterForm) {
   filterForm.addEventListener('submit', function (e) {
@@ -210,7 +211,7 @@ if (filterForm) {
   });
 }
 
-// ✅ Check superuser before loading dashboard
+// Check superuser
 window.addEventListener('DOMContentLoaded', async () => {
   const token = localStorage.getItem("token");
 
@@ -232,7 +233,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ✅ User is superuser — load dashboard
     loadStatistics();
     loadRecentTransactions();
     loadCharts();

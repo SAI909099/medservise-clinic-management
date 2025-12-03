@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>{{ clinic_name }} — Chek</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--ink:#111;--muted:#6b7280;--line:#e5e7eb}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;margin:24px;color:var(--ink)}
+    .toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px}
+    .btn{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
+    .btn:hover{background:#f9fafb}
+    h1{font-size:18px;margin:0}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+    .muted{color:var(--muted)}
+    .table{width:100%;border-collapse:collapse;margin:12px 0}
+    .table th,.table td{border:1px solid var(--line);padding:8px 10px;font-size:14px}
+    .table th{background:#f9fafb;text-align:left}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .right{text-align:right}
+    @media print {
+      .toolbar{display:none}
+      body{margin:0}
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="btn" onclick="window.print()">🖨 Print</button>
+    <button class="btn" onclick="window.close()">✖ Close</button>
+  </div>
+
+  <div class="header">
+    <div>
+      <div class="muted">{{ clinic_name }}</div>
+      <h1>Bemor hisob-chek</h1>
+      <div class="muted">Yig‘ma hisob</div>
+    </div>
+    <div class="muted">Sana: {% now "Y-m-d H:i" %}</div>
+  </div>
+
+  <table class="table">
+    <tbody>
+      <tr>
+        <th style="width:160px">Bemor</th>
+        <td>{{ patient.first_name }} {{ patient.last_name }}</td>
+      </tr>
+      <tr>
+        <th>Telefon</th>
+        <td>{{ patient.phone|default:"—" }}</td>
+      </tr>
+      <tr>
+        <th>Shifokor</th>
+        <td>{{ doctor_name|default:"—" }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:16px;margin-top:18px">Hisob-kitob</h3>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Turi</th>
+        <th class="right">Miqdor (so'm)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Konsultatsiya (hisob)</td>
+        <td class="right">{{ consultation_cost|default:0|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td>Xizmatlar (hisob)</td>
+        <td class="right">{{ services_cost|default:0|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td>Xona to‘lovi (hisob)</td>
+        <td class="right">{{ room_cost|default:0|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <th>Jami hisoblangan</th>
+        <th class="right">{{ due_total|default:0|floatformat:0 }}</th>
+      </tr>
+      <tr>
+        <td>To‘langan</td>
+        <td class="right">{{ paid_total|default:0|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <th>Qoldiq</th>
+        <th class="right">{{ balance|default:0|floatformat:0 }}</th>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid">
+    <div>
+      <h3 style="font-size:16px;margin-top:6px">Naqd/servis to‘lovlari</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Sana</th>
+            <th>Turi</th>
+            <th>Usuli</th>
+            <th class="right">Miqdor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if cash_payments %}
+            {% for c in cash_payments %}
+              <tr>
+                <td>{{ c.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ c.get_transaction_type_display|default:c.transaction_type }}</td>
+                <td>{{ c.get_payment_method_display|default:c.payment_method }}</td>
+                <td class="right">{{ c.amount|default:0|floatformat:0 }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="4" class="muted">Ma'lumot yo‘q</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h3 style="font-size:16px;margin-top:6px">Xona to‘lovlari</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Sana</th>
+            <th>Holat</th>
+            <th>Usuli</th>
+            <th class="right">Miqdor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if room_payments %}
+            {% for r in room_payments %}
+              <tr>
+                <td>{{ r.date|date:"Y-m-d H:i" }}</td>
+                <td>{{ r.status|default:"—" }}</td>
+                <td>
+                  {% if r.get_payment_method_display %}{{ r.get_payment_method_display }}
+                  {% else %}{{ r.payment_method|default:"—" }}{% endif %}
+                </td>
+                <td class="right">{{ r.amount|default:0|floatformat:0 }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="4" class="muted">Ma'lumot yo‘q</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:48px;margin-top:40px">
+    <div style="flex:1;text-align:center">
+      <div class="muted">Qabul qiluvchi / Cashier</div>
+      <div style="border-top:1px solid var(--line);margin-top:36px"></div>
+    </div>
+    <div style="flex:1;text-align:center">
+      <div class="muted">Bemor / Patient</div>
+      <div style="border-top:1px solid var(--line);margin-top:36px"></div>
+    </div>
+  </div>
+</body>
+</html>

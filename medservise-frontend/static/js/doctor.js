@@ -4,9 +4,12 @@ if (!token) {
   window.location.href = "/";
 }
 
+// ⛳ Auto-detect API base dynamically
+const API = window.location.origin.replace(/\/+$/, "") + "/api/v1/";
+
 document.addEventListener("DOMContentLoaded", () => {
-  // 🔒 Tekshiruv: Foydalanuvchini aniqlash
-  fetch("http://89.39.95.150/api/v1/profile/", {
+  // 🔒 User check
+  fetch(`${API}profile/`, {
     headers: { Authorization: `Bearer ${token}` },
   })
     .then((res) => {
@@ -31,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.querySelector("#appointments-table tbody");
 
   function loadAppointments(date = null, search = "") {
-    fetch("http://89.39.95.150/api/v1/my-appointments/", {
+    fetch(`${API}my-appointments/`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -88,33 +91,30 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
-  // 🔃 Avtomatik yuklash (every 5 seconds)
+  // 🔃 Auto-refresh every 5 seconds
   setInterval(() => {
     const selectedDate = dateFilter?.value || null;
     const nameQuery = searchName?.value || "";
     loadAppointments(selectedDate, nameQuery);
   }, 5000);
 
-  // 🔘 Bugungi qabul tugmasi
   document.getElementById("filter-today-btn")?.addEventListener("click", () => {
     const today = new Date().toISOString().split("T")[0];
     dateFilter.value = today;
     loadAppointments(today, searchName.value);
   });
 
-  // 🔘 Qidirish tugmasi
   document.getElementById("apply-filters-btn")?.addEventListener("click", () => {
     const selectedDate = dateFilter.value;
     const nameQuery = searchName.value;
     loadAppointments(selectedDate || null, nameQuery);
   });
 
-  // 🔃 Boshlang'ich yuklash
   loadAppointments();
 });
 
 function markDone(id) {
-  fetch(`http://89.39.95.150/api/v1/my-appointments/${id}/`, {
+  fetch(`${API}my-appointments/${id}/`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -126,7 +126,7 @@ function markDone(id) {
       if (!res.ok) throw new Error("Qabulni yangilab boʻlmadi.");
       return res.json();
     })
-    .then(() => fetch(`http://89.39.95.150/api/v1/clear-call/${id}/`, {
+    .then(() => fetch(`${API}clear-call/${id}/`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` }
     }))
@@ -137,7 +137,7 @@ function markDone(id) {
 }
 
 function callPatient(appointmentId) {
-  fetch(`http://89.39.95.150/api/v1/call-patient/${appointmentId}/`, {
+  fetch(`${API}call-patient/${appointmentId}/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -148,7 +148,7 @@ function callPatient(appointmentId) {
       return res.json();
     })
     .then(() => {
-      new Audio("/static/sound/beepmm.wav").play(); // 🎵 Sound only
+      new Audio("/static/sound/beepmm.wav").play();
       const btn = document.querySelector(`button[onclick="callPatient(${appointmentId})"]`);
       if (btn) {
         btn.textContent = "🔁 Qayta chaqirish";
@@ -168,7 +168,7 @@ function confirmDelete(id) {
 }
 
 function deleteApp(id) {
-  fetch(`http://89.39.95.150/api/v1/my-appointments/${id}/`, {
+  fetch(`${API}my-appointments/${id}/`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <title>Discharge Receipt</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    /* ===== A4 print layout ===== */
+    @page { size: A4; margin: 15mm; }
+    html, body { background: #fff; color: #111; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif; }
+    .container { max-width: 800px; margin: 0 auto; }
+
+    h1, h2, h3 { margin: 0 0 6px; }
+    h1 { font-size: 22px; letter-spacing: .5px; }
+    h2 { font-size: 16px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-top: 18px; }
+    .muted { color: #666; }
+    .right { text-align: right; }
+    .center { text-align: center; }
+
+    .head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+      border-bottom: 2px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+    .clinic { font-weight: 700; }
+    .stamp { font-size: 12px; text-align: right; }
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 20px;
+      margin: 8px 0 14px;
+    }
+    .meta div { padding: 4px 0; }
+
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+    th, td { border: 1px solid #e5e5e5; padding: 8px; vertical-align: top; }
+    th { background: #fafafa; font-weight: 600; }
+
+    .no-borders th, .no-borders td { border: 0; }
+    .totals { width: 100%; border-collapse: collapse; }
+    .totals td { padding: 6px 8px; }
+    .totals .label { text-align: right; width: 70%; }
+    .totals .value { text-align: right; width: 30%; }
+
+    .bg-light { background: #fafafa; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      border: 1px solid #ddd;
+      background: #f5f5f5;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .sign {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px;
+    }
+    .sign .line { border-top: 1px solid #444; height: 1px; margin-top: 40px; }
+
+    .note { font-size: 12px; color: #555; margin-top: 8px; }
+
+    @media print {
+      .no-print { display: none !important; }
+      a { color: #000; text-decoration: none; }
+    }
+
+    .print-actions {
+      position: sticky; top: 0; background: #fff; padding: 8px 0; margin-bottom: 8px;
+      display: flex; gap: 8px; justify-content: flex-end; border-bottom: 1px dashed #ddd;
+    }
+    .btn {
+      padding: 6px 10px; border: 1px solid #ccc; background: #f8f8f8; cursor: pointer; border-radius: 6px;
+    }
+    .btn:hover { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Screen-only actions -->
+  <div class="print-actions no-print">
+    <button class="btn" onclick="window.print()">🖨 Print</button>
+    <button class="btn" onclick="window.close()">✖ Close</button>
+  </div>
+
+  <header class="head">
+    <div>
+      <div class="clinic">{{ clinic_name|default:"Controllab Clinic" }}</div>
+      <h1>Discharge Receipt / Chiqish Cheki</h1>
+      <div class="muted">A4 — bemor chiqarish bo‘yicha umumiy hisob</div>
+    </div>
+    <div class="stamp">
+      <div><strong>Sana:</strong> {{ discharged_at|date:"Y-m-d H:i" }}</div>
+      <div><strong>Raqam:</strong> DR-{{ registration.id }}</div>
+    </div>
+  </header>
+
+  <!-- Meta info -->
+  <section class="meta">
+    <div><strong>Bemor:</strong>
+      {% if patient %} {{ patient.first_name }} {{ patient.last_name }}{% else %}—{% endif %}
+    </div>
+    <div><strong>Shifokor:</strong>
+      {% if doctor %} {{ doctor.user.first_name }} {{ doctor.user.last_name }}{% else %}—{% endif %}
+    </div>
+
+    <div><strong>Xona:</strong>
+      {% if room %} {{ room.name }} (narx: {{ room_rate|floatformat:0 }} so'm/kun){% else %}—{% endif %}
+    </div>
+    <div><strong>Davr:</strong>
+      {{ assigned_at|date:"Y-m-d H:i" }} → {{ discharged_at|date:"Y-m-d H:i" }}
+    </div>
+
+    <div><strong>To‘liq kunlar:</strong> {{ days }} kun</div>
+    <div><strong>Hisoblagan foydalanuvchi:</strong> {% if request.user %}{{ request.user.get_full_name }}{% else %}—{% endif %}</div>
+  </section>
+
+  <!-- Charges -->
+  <h2>Hisob-kitob / Charges</h2>
+  <table class="no-borders">
+    <tbody>
+      {% if consultation_cost and consultation_cost|floatformat:0 != "0" %}
+      <tr>
+        <td class="label">Konsultatsiya qiymati</td>
+        <td class="value">{{ consultation_cost|floatformat:0 }} so'm</td>
+      </tr>
+      {% endif %}
+
+      {% if services_cost and services_cost|floatformat:0 != "0" %}
+      <tr>
+        <td class="label">Xizmatlar qiymati (laboratoriya / xizmatlar)</td>
+        <td class="value">{{ services_cost|floatformat:0 }} so'm</td>
+      </tr>
+      {% endif %}
+
+      <tr>
+        <td class="label">Xona to‘lovi ({{ days }} × {{ room_rate|floatformat:0 }} so'm)</td>
+        <td class="value">{{ room_cost|floatformat:0 }} so'm</td>
+      </tr>
+
+      <tr class="bg-light">
+        <td class="label"><strong>Jami hisoblangan (Due total)</strong></td>
+        <td class="value"><strong>{{ due_total|floatformat:0 }} so'm</strong></td>
+      </tr>
+      <tr>
+        <td class="label">Oldindan to‘langan summa (All payments)</td>
+        <td class="value">{{ paid_total|floatformat:0 }} so'm</td>
+      </tr>
+
+      {% if balance >= 0 %}
+      <tr>
+        <td class="label"><strong>Qolgan to‘lov (Balance due)</strong></td>
+        <td class="value"><strong>{{ balance|floatformat:0 }} so'm</strong></td>
+      </tr>
+      {% else %}
+      <tr>
+        <td class="label"><strong>Ortiqcha to‘lov (Refund due)</strong></td>
+        <td class="value"><strong>{{ balance|floatformat:0|slice:"1:" }} so'm qaytarish</strong></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- Payments history -->
+  <div class="row">
+    <div>
+      <h2>Naqd/Servis to‘lovlari (Cash & Services)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Sana</th>
+            <th>Turi</th>
+            <th>Usuli</th>
+            <th class="right">Miqdor (so'm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if cash_payments %}
+            {% for p in cash_payments %}
+              <tr>
+                <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
+                <td>
+                  <span class="badge">
+                    {{ p.get_transaction_type_display|default:p.transaction_type }}
+                  </span>
+                </td>
+                <td>{{ p.get_payment_method_display|default:p.payment_method }}</td>
+                <td class="right">{{ p.amount|floatformat:0 }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="4" class="center muted">Ma’lumot yo‘q</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h2>Xona to‘lovlari (Room Payments)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Sana</th>
+            <th>Holat</th>
+            <th>Usuli</th>
+            <th class="right">Miqdor (so'm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if room_payments %}
+            {% for p in room_payments %}
+              <tr>
+                <td>{{ p.date|date:"Y-m-d H:i" }}</td>
+                <td><span class="badge">{{ p.status|default:"—" }}</span></td>
+                <td>{{ p.get_payment_method_display|default:p.payment_method }}</td>
+                <td class="right">{{ p.amount|floatformat:0 }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="4" class="center muted">Ma’lumot yo‘q</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer / Signatures -->
+  <div class="sign">
+    <div>
+      <div class="muted">Qabul qiluvchi / Cashier</div>
+      <div class="line"></div>
+    </div>
+    <div>
+      <div class="muted">Bemor / Patient</div>
+      <div class="line"></div>
+    </div>
+  </div>
+
+  <p class="note">
+    Izoh: Ushbu hujjat bemorni chiqarish paytida shakllantiriladi. Ko‘rsatilgan summalar klinika tizimidagi ma’lumotlarga asoslangan.
+  </p>
+</div>
+
+<script>
+  // Auto-open print dialog when the page loads (optional).
+  window.addEventListener('load', function () {
+    window.print();
+  });
+</script>
+</body>
+</html>
+

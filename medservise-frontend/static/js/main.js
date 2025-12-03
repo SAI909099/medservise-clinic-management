@@ -1,4 +1,9 @@
+
 document.addEventListener("DOMContentLoaded", function () {
+
+  // 🔥 Auto-detected base API
+  const API_BASE = (window.API_BASE || location.origin.replace(/\/+$/, '')) + "/api/v1/";
+
   const form = document.querySelector("form");
 
   // ------------------------ LOGIN FORM SUBMIT ------------------------
@@ -9,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const email = document.querySelector("input[name='email']").value;
       const password = document.querySelector("input[name='password']").value;
 
-      fetch("/api/v1/login/", {
+      fetch(API_BASE + "login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -23,7 +28,7 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.setItem("token", data.access);
             localStorage.setItem("refresh", data.refresh);
 
-            return fetch("/api/v1/user-profile/", {
+            return fetch(API_BASE + "user-profile/", {
               headers: { Authorization: `Bearer ${data.access}` },
             }).then(res => {
               if (!res.ok) throw new Error("Foydalanuvchi aniqlanmadi");
@@ -94,7 +99,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ------------------------ DOCTOR DASHBOARD LOGIC ------------------------
   if (path === "/doctor/") {
-    fetch("/api/v1/my-appointments/", {
+    fetch(API_BASE + "my-appointments/", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -135,8 +140,9 @@ document.addEventListener("DOMContentLoaded", function () {
 // ------------------------ MARK DONE ------------------------
 function markDone(id) {
   const token = localStorage.getItem("token");
+  const API_BASE = (window.API_BASE || location.origin.replace(/\/+$/, '')) + "/api/v1/";
 
-  fetch(`/api/v1/doctor/appointments/${id}/`, {
+  fetch(API_BASE + `doctor/appointments/${id}/`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -156,8 +162,9 @@ function markDone(id) {
 // ------------------------ DELETE APPOINTMENT ------------------------
 function deleteApp(id) {
   const token = localStorage.getItem("token");
+  const API_BASE = (window.API_BASE || location.origin.replace(/\/+$/, '')) + "/api/v1/";
 
-  fetch(`/api/v1/doctor/appointments/${id}/`, {
+  fetch(API_BASE + `doctor/appointments/${id}/`, {
     method: "DELETE",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -175,8 +182,9 @@ function deleteApp(id) {
 // ------------------------ VIEW PATIENT UPLOADS ------------------------
 function viewUploads(patientId) {
   const token = localStorage.getItem("token");
+  const API_BASE = (window.API_BASE || location.origin.replace(/\/+$/, '')) + "/api/v1/";
 
-  fetch(`/api/v1/patient-results/?patient=${patientId}`, {
+  fetch(API_BASE + `patient-results/?patient=${patientId}`, {
     headers: {
       "Authorization": `Bearer ${token}`,
     },

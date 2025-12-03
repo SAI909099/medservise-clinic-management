@@ -1,7 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
-  const BASE_API_URL = "http://89.39.95.150/api/v1/";
+
+  // 🔥 FIXED: dynamic auto-detect API base
+  const BASE_API_URL = `${window.location.origin}/api/v1/`;
+
   const tbody = document.querySelector("#payments-table tbody");
 
   // Allow only doctors, admins, or accountants

@@ -1,4 +1,7 @@
-const BASE_URL = "http://89.39.95.150";
+// ==== Dynamic API Base (fix) ====
+const BASE_URL =
+  (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1";
+
 const token = localStorage.getItem("token");
 
 if (!token) {
@@ -13,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const doctorSelect = document.getElementById("doctor-select");
 
   function loadDoctors() {
-    fetch(`${BASE_URL}/api/v1/doctor-list/`, {
+    fetch(`${BASE_URL}/doctor-list/`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -24,8 +27,11 @@ document.addEventListener("DOMContentLoaded", () => {
         data.forEach(doc => {
           if (doctorList) {
             const li = document.createElement("li");
-            li.className = "list-group-item d-flex justify-content-between align-items-center";
-            li.innerHTML = `<div><strong>${doc.name}</strong> — ${doc.specialty || '—'}</div>`;
+            li.className =
+              "list-group-item d-flex justify-content-between align-items-center";
+            li.innerHTML = `<div><strong>${doc.name}</strong> — ${
+              doc.specialty || "—"
+            }</div>`;
             doctorList.appendChild(li);
           }
 
@@ -40,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function loadServices() {
-    fetch(`${BASE_URL}/api/v1/services/`, {
+    fetch(`${BASE_URL}/services/`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -48,8 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (serviceList) serviceList.innerHTML = "";
         data.forEach(service => {
           const li = document.createElement("li");
-          li.className = "list-group-item d-flex justify-content-between align-items-center";
-          li.innerHTML = `<div><strong>${service.name}</strong> — ${service.price} so'm (${service.doctor?.name || 'Doktor yo‘q'})</div>`;
+          li.className =
+            "list-group-item d-flex justify-content-between align-items-center";
+          li.innerHTML = `<div><strong>${service.name}</strong> — ${
+            service.price
+          } so'm (${service.doctor?.name || "Doktor yo‘q"})</div>`;
           serviceList.appendChild(li);
         });
       });
@@ -68,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      fetch(`${BASE_URL}/api/v1/services/`, {
+      fetch(`${BASE_URL}/services/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -81,7 +90,10 @@ document.addEventListener("DOMContentLoaded", () => {
         })
       })
         .then(res => {
-          if (!res.ok) return res.json().then(err => { throw err; });
+          if (!res.ok)
+            return res.json().then(err => {
+              throw err;
+            });
           return res.json();
         })
         .then(() => {

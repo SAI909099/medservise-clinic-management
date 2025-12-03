@@ -4,11 +4,15 @@ const searchInput = document.getElementById("search-input");
 const yearFilter = document.getElementById("year-filter");
 const refreshBtn = document.getElementById("refresh-btn");
 
+// 🔥 FIXED — dynamic API base
+const API_BASE = window.location.origin + "/api/v1";
+
 let allPatients = [];
 
 function fetchPatients() {
   patientListDiv.innerHTML = "<p>Yuklanmoqda...</p>";
-  fetch("http://89.39.95.150/api/v1/patients/archive/", {
+
+  fetch(`${API_BASE}/patients/archive/`, {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,

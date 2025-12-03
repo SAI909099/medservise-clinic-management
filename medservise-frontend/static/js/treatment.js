@@ -6,6 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  // 🔥 Dynamic API base
+  const BASE_URL = (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1";
+
   const form = document.getElementById("room-form");
   const roomNameInput = document.getElementById("room-name");
   const capacityInput = document.getElementById("capacity");
@@ -26,9 +29,11 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const editId = form.dataset.editId;
+
+    // 🔧 FIXED URL
     const url = editId
-      ? `http://89.39.95.150/api/v1/treatment-rooms/${editId}/`
-      : "http://89.39.95.150/api/v1/treatment-rooms/";
+      ? `${BASE_URL}/treatment-rooms/${editId}/`
+      : `${BASE_URL}/treatment-rooms/`;
 
     const method = editId ? "PUT" : "POST";
 
@@ -58,7 +63,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function loadRooms() {
-    fetch("http://89.39.95.150/api/v1/treatment-rooms/", {
+    // 🔧 FIXED URL
+    fetch(`${BASE_URL}/treatment-rooms/`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     .then(res => res.json())
@@ -94,7 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Delete button handler
         card.querySelector(".delete-btn").addEventListener("click", () => {
           if (confirm("Are you sure you want to delete this room?")) {
-            fetch(`http://89.39.95.150/api/v1/treatment-rooms/${room.id}/`, {
+            
+            // 🔧 FIXED URL
+            fetch(`${BASE_URL}/treatment-rooms/${room.id}/`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` }
             })

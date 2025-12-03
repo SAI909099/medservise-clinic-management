@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>To‘lanmagan bemorlar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{background:#f8f9fa}
+    .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+    .table thead th{background:#f3f4f6}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h1 class="h4 m-0">To‘lanmagan bemorlar</h1>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/patient-balances/">Hisoblar</a>
+        <button class="btn btn-outline-danger" onclick="localStorage.removeItem('token');location.href='/'">Chiqish</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <input id="searchInput" class="form-control form-control-sm" placeholder="Qidirish: ism / tel / ID" style="max-width:260px">
+        <select id="limitSelect" class="form-select form-select-sm" style="width:120px">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="200">200</option>
+        </select>
+        <button id="refreshBtn" class="btn btn-sm btn-outline-secondary ms-auto">Yangilash</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="unpaidTable">
+          <thead>
+            <tr>
+              <th style="width:52px">#</th>
+              <th>Bemor</th>
+              <th>Shifokor</th>
+              <th class="text-end">Jami hisob</th>
+              <th class="text-end">To‘langan</th>
+              <th class="text-end">Qoldiq</th>
+              <th style="width:160px">Amal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="7" class="text-muted">Yuklanmoqda…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <div id="countInfo" class="text-muted small">0</div>
+        <div class="btn-group">
+          <button id="prevBtn" class="btn btn-outline-secondary btn-sm">Oldingi</button>
+          <button id="nextBtn" class="btn btn-outline-secondary btn-sm">Keyingi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Pay Modal -->
+  <div class="modal fade" id="quickPayModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="quickPayForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Tez to‘lov</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="qpPatientId">
+          <div class="mb-2">
+            <label class="form-label">Bemor</label>
+            <input id="qpPatientName" class="form-control" disabled>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-sm-6">
+              <label class="form-label">To‘lov turi</label>
+              <select id="qpTxnType" class="form-select">
+                <option value="consultation">Konsultatsiya</option>
+                <option value="service">Xizmat</option>
+                <option value="treatment">Davolash (xona)</option>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">To‘lov usuli</label>
+              <select id="qpMethod" class="form-select">
+                <option value="cash">Naqd</option>
+                <option value="card">Karta</option>
+                <option value="transfer">Bank</option>
+                <option value="insurance">Sug‘urta</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-2 mt-1">
+            <div class="col-sm-6">
+              <label class="form-label">Miqdor (so‘m)</label>
+              <input id="qpAmount" type="number" min="0" step="1000" class="form-control" placeholder="0">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Qoldiq (ko‘rsatish uchun)</label>
+              <input id="qpBalance" class="form-control" disabled>
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <label class="form-label">Izoh (ixtiyoriy)</label>
+            <textarea id="qpNotes" class="form-control" rows="2" placeholder="Masalan: Service Payment: CBC, Biokimyo"></textarea>
+            <div class="form-text">Izoh “Admin/Accountant” sahifalarida ham ko‘rinadi.</div>
+          </div>
+
+          <div id="qpAlert" class="alert alert-danger mt-2 d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="qpSubmit" class="btn btn-primary">Saqlash</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Bekor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/unpaid-patients.js?v=2" defer></script>
+</body>
+</html>

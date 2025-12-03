@@ -7,7 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  fetch("http://89.39.95.150/api/v1/payments/", {
+  // 🔥 Dynamic API base — works on ANY IP/domain/server
+  const BASE_API =
+    (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1/";
+
+  fetch(`${BASE_API}payments/`, {
     headers: {
       Authorization: `Bearer ${token}`
     }

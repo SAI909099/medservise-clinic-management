@@ -24,3 +24,33 @@ celerybeat-schedule
 # IDE
 .idea/
 .vscode/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+.venv/
+env/
+venv/
+
+# Environment files
+.env
+*.env
+secret.json
+
+# Django
+db.sqlite3
+media/
+static/
+logs/
+celerybeat-schedule
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

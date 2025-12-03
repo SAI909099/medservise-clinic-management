@@ -1,39 +1,34 @@
-<!DOCTYPE html>
+{% load static %}
+<!doctype html>
 <html lang="uz">
 <head>
-  <meta charset="UTF-8">
-  <title>Foydalanuvchi Qo‘shish</title>
+  <meta charset="utf-8">
+  <title>Foydalanuvchi Qo‘shish (Doctor / Staff)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <style>
-    body { background-color: #f8f9fa; }
+    body{background:#f8f9fa}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+    .table thead th{background:#f3f4f6}
   </style>
 </head>
-<body class="p-4">
-  <div class="container">
-    <h2 class="mb-4">👤 Foydalanuvchi Qo‘shish (Doctor / Staff)</h2>
+<body>
+  <div class="wrap">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h1 class="h4 m-0">👤 Foydalanuvchi Qo‘shish (Doctor / Staff)</h1>
+      <a href="/doctors/" class="link-primary">👀 To‘liq ro‘yxat (Edit/Delete bilan)</a>
+    </div>
 
-    <!-- 🔽 Registration Form -->
-    <form id="doctor-form" class="row g-3 mb-5">
+    <!-- Create form -->
+    <form id="doctor-form" class="row g-3 mb-4" onsubmit="return false;">
+      <div class="col-md-6"><input id="first-name"  class="form-control" placeholder="Ism" required></div>
+      <div class="col-md-6"><input id="last-name"   class="form-control" placeholder="Familiya" required></div>
+      <div class="col-md-6"><input id="email"       class="form-control" type="email" placeholder="Email" required></div>
+      <div class="col-md-6"><input id="password"    class="form-control" type="password" placeholder="Parol" required></div>
+      <div class="col-md-6"><input id="dob"         class="form-control" type="date" required></div>
+      <div class="col-md-6"><input id="phone"       class="form-control" placeholder="Telefon raqami" required></div>
       <div class="col-md-6">
-        <input type="text" class="form-control" id="first-name" placeholder="Ism" required>
-      </div>
-      <div class="col-md-6">
-        <input type="text" class="form-control" id="last-name" placeholder="Familiya" required>
-      </div>
-      <div class="col-md-6">
-        <input type="email" class="form-control" id="email" placeholder="Email" required>
-      </div>
-      <div class="col-md-6">
-        <input type="password" class="form-control" id="password" placeholder="Parol" required>
-      </div>
-      <div class="col-md-6">
-        <input type="date" class="form-control" id="dob" required>
-      </div>
-      <div class="col-md-6">
-        <input type="text" class="form-control" id="phone" placeholder="Telefon raqami" required>
-      </div>
-      <div class="col-md-6">
-        <select class="form-select" id="role" required>
+        <select id="role" class="form-select" required>
           <option value="" disabled selected>Rolni tanlang</option>
           <option value="doctor">Doctor</option>
           <option value="cashier">Cashier</option>
@@ -42,26 +37,93 @@
           <option value="admin">Admin</option>
         </select>
       </div>
-
-      <div class="col-md-6" id="specialty-group" style="display: none;">
-        <input type="text" class="form-control" id="specialty" placeholder="Mutaxassisligi">
+      <div class="col-md-6" id="specialty-group" style="display:none;">
+        <input id="specialty" class="form-control" placeholder="Mutaxassisligi">
       </div>
-      <div class="col-md-6" id="price-group" style="display: none;">
-        <input type="number" class="form-control" id="price" placeholder="Konsultatsiya narxi (so'm)">
+      <div class="col-md-6" id="price-group" style="display:none;">
+        <input id="price" class="form-control" type="number" min="0" placeholder="Konsultatsiya narxi (so'm)">
       </div>
-
-      <div class="col-md-12">
-        <button type="submit" class="btn btn-primary w-100">Qo‘shish</button>
+      <div class="col-12 d-grid">
+        <button id="createBtn" class="btn btn-primary">Qo‘shish</button>
       </div>
     </form>
 
-    <!-- User List -->
+    <!-- List (same IDs as /doctors/, so the same JS works) -->
     <div class="card">
-      <div class="card-header">📋 Ro‘yxat</div>
-      <ul id="doctor-list" class="list-group list-group-flush"></ul>
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span>📋 Ro‘yxat</span>
+        <input id="searchInput" class="form-control" style="max-width:260px" type="search" placeholder="Qidirish (ism, telefon)">
+      </div>
+      <div class="table-responsive">
+        <table id="doctors-table" class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>F.I.Sh</th>
+              <th>Mutaxassisligi</th>
+              <th>Telefon</th>
+              <th>Konsultatsiya</th>
+              <th>Amallar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6" class="text-muted">Ma’lumot yuklanmoqda…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <script src="/static/js/doctor-add.js"></script>
+  <!-- ✏️ Edit modal (same IDs as /doctors/) -->
+  <div class="modal fade" id="editDoctorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="edit-doctor-form" class="modal-content" onsubmit="return false;">
+        <div class="modal-header">
+          <h5 class="modal-title">Shifokorni tahrirlash</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Ism</label>
+            <input name="first_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Familiya</label>
+            <input name="last_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Mutaxassisligi</label>
+            <input name="specialty" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Telefon</label>
+            <input name="phone" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Konsultatsiya narxi (so'm)</label>
+            <input name="consultation_price" type="number" min="0" class="form-control">
+          </div>
+
+          <!-- Holder for credentials (created dynamically by JS). Hidden by default. -->
+          <div class="col-12 d-none" id="credBoxWrap">
+            <div id="pw-reveal-box" class="alert alert-warning py-2 px-3 mb-0" style="word-break: break-word;"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <!-- NEW: Admin link (opens admin; deep-links to /change/ if ID is known) -->
+          <a href="/admin/apps/doctor/" id="openAdminBtn" target="_blank" rel="noopener" class="btn btn-outline-dark">⚙️ Admin</a>
+          <!-- Existing: Show credentials -->
+          <button type="button" id="showCredsBtn" class="btn btn-outline-warning">🔑 Login/Parol</button>
+          <button type="button" id="saveEditBtn" class="btn btn-primary">Saqlash</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Bekor qilish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{% static 'js/doctor-add.js' %}?v=controllab5"></script>
+  <script src="{% static 'js/doctors.js' %}?v=controllab4"></script>
 </body>
 </html>
+

@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip install --upgrade pip && \
+    pip install -r req.txt
+
+CMD ["celery", "-A", "root", "worker", "--loglevel=info"]

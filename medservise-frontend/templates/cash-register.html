@@ -46,6 +46,9 @@
     <h4>📋 Neuro Puls</h4>
     <a href="/cash-register">💰 Kassa</a>
     <a href="/treatment-room-payments">🏥 Davolash Xonasi Toʻlovlari</a>
+    <li class="nav-item">  <a href="/patient-balances/" class="nav-link text-white">🧾 Bemor Hisoblari</a></li>
+    <li class="nav-item"> <a href="/api/v1/unpaid-patients/" class="nav-link text-white" >To‘lanmagan bemorlar uchun to`lov </a></li>
+    <li class="nav-item"> <a href="/list_unpaid-patients/" class="nav-link text-white" >To‘lanmagan bemorlar uchun check</a></li>
     <div>  -----------------------------------------------------</div>
     <a href="/turn-display">🔁 Navbat Ekrani</a>
     <a href="/" onclick="logout()">🚪 Chiqish</a>
@@ -67,12 +70,15 @@
       <div class="card-header bg-warning text-dark">
         <h4 class="mb-0">🕒 Oxirgi bemorlar</h4>
       </div>
-      <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+      <!-- ⬇️ added id so JS can resize this area -->
+      <div id="recent-patients-body" class="card-body" style="max-height: 300px; overflow-y: auto;">
         <label for="days-filter" class="form-label">Ko‘rsatish muddati:</label>
         <select id="days-filter" class="form-select w-auto d-inline mb-3">
           <option value="1">Oxirgi 1 kun</option>
           <option value="3" selected>Oxirgi 3 kun</option>
           <option value="7">Oxirgi 7 kun</option>
+          <option value="30">Oxirgi 30 kun</option>   <!-- NEW -->
+          <option value="all">Barchasi</option>       <!-- NEW -->
         </select>
         <ul id="patient-list" class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;"></ul>
       </div>
@@ -119,10 +125,6 @@
             <div class="col-md-3">
               <label class="form-label">Toʻlov summasi</label>
               <input type="number" id="amount" class="form-control" step="0.01" min="0" required readonly />
-<!--              <div class="form-check mt-1">-->
-<!--                <input class="form-check-input" type="checkbox" id="edit-amount-checkbox" />-->
-<!--                <label class="form-check-label" for="edit-amount-checkbox">Summani tahrirlash</label>-->
-<!--              </div>-->
             </div>
 
             <div class="col-md-3">
@@ -177,5 +179,4 @@
   <!-- Asosiy skript -->
   <script src="../static/js/cash_register.js"></script>
 </body>
-
 </html>

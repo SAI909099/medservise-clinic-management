@@ -1,4 +1,6 @@
 from django.views.generic import TemplateView
+from django.views.generic import TemplateView  # <-- add this
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -50,7 +52,15 @@ urlpatterns = [
     path('print_receipt.html', TemplateView.as_view(template_name='print_receipt.html')),
 
     path("services/doctor/<int:doctor_id>/", PublicDoctorServicePageView.as_view(), name="public-doctor-service-page"),
+    path('patient-balances/', TemplateView.as_view(template_name='patient-balances.html'), name='patient-balances'), 
+
+    path( "doctor/service-worklist/", TemplateView.as_view(template_name="doctor-service-worklist.html"),name="doctor_service_worklist",),
+    path('list_unpaid-patients/', TemplateView.as_view(template_name='list_unpaid-patients.html'), name='list_unpaid-patients'),
 
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) + static(settings.STATIC_URL,
                                                                                          document_root=settings.STATIC_ROOT)
+from django.views.generic import TemplateView
+urlpatterns += [
+    path('patient-billing/', TemplateView.as_view(template_name='patient-billing.html')),
+]

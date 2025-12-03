@@ -1,4 +1,7 @@
-const BASE_URL = "http://89.39.95.150/api/v1";
+// 🔥 Dynamic BASE_URL — works on any IP/domain/localhost
+const BASE_URL =
+  (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1";
+
 const token = localStorage.getItem("token");
 
 if (!token) {
@@ -21,7 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchRooms();
 });
 
+// ===========================
 // DOCTORS
+// ===========================
 function fetchDoctors() {
   fetch(`${BASE_URL}/doctor-list/`, { headers })
     .then((res) => res.json())
@@ -31,7 +36,8 @@ function fetchDoctors() {
       doctors.forEach((doc) => {
         doctorPrices[doc.id] = doc.consultation_price;
         const li = document.createElement("li");
-        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.className =
+          "list-group-item d-flex justify-content-between align-items-center";
         li.innerHTML = `
           <span>${doc.name}</span>
           <input type="number" step="0.01" class="form-control form-control-sm w-25"
@@ -62,7 +68,9 @@ function confirmDoctorPriceChanges() {
   alert("✅ Doctor prices updated");
 }
 
+// ===========================
 // SERVICES
+// ===========================
 function fetchServices() {
   fetch(`${BASE_URL}/services/`, { headers })
     .then((res) => res.json())
@@ -72,7 +80,8 @@ function fetchServices() {
       services.forEach((service) => {
         servicePrices[service.id] = service.price;
         const li = document.createElement("li");
-        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.className =
+          "list-group-item d-flex justify-content-between align-items-center";
         li.innerHTML = `
           <span>${service.name} (${service.doctor?.name || "No Doctor"})</span>
           <input type="number" step="0.01" class="form-control form-control-sm w-25"
@@ -103,7 +112,9 @@ function confirmServicePriceChanges() {
   alert("✅ Service prices updated");
 }
 
+// ===========================
 // ROOMS
+// ===========================
 function fetchRooms() {
   fetch(`${BASE_URL}/treatment-rooms/`, { headers })
     .then((res) => res.json())
@@ -113,7 +124,8 @@ function fetchRooms() {
       rooms.forEach((room) => {
         roomPrices[room.id] = room.price_per_day;
         const li = document.createElement("li");
-        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.className =
+          "list-group-item d-flex justify-content-between align-items-center";
         li.innerHTML = `
           <span>${room.name} (Floor ${room.floor})</span>
           <input type="number" step="0.01" class="form-control form-control-sm w-25"

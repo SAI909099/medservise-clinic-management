@@ -1,3 +1,4 @@
+(.venv) root@vmi2942268:/var/www/Medservise# cat medservise-frontend/static/js/patient_selection.js 
 document.addEventListener("DOMContentLoaded", async function () {
   const token = localStorage.getItem("token");
 
@@ -122,3 +123,4 @@ function renderPatients(patients) {
 function selectPatient(patientId) {
   window.location.href = `/cash-register.html?patient_id=${patientId}`;
 }
+(.venv) root@vmi2942268:/var/www/Medservise# 

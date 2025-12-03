@@ -6,7 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  const BASE_URL = "http://89.39.95.150/api/v1/";
+  // ✅ Dynamic BASE_URL — works on ANY IP, domain, localhost, Docker, etc.
+  const BASE_URL =
+    (window.API_BASE || location.origin.replace(/\/+$/, "")) + "/api/v1/";
+
   const headers = { Authorization: `Bearer ${token}` };
 
   const doctorSelect = document.getElementById("doctor_id");
@@ -39,7 +42,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   doctorSelect.addEventListener("change", () => {
     const selectedDoctorId = parseInt(doctorSelect.value);
-    const selectedPrice = parseFloat(doctorSelect.options[doctorSelect.selectedIndex].dataset.price || 0);
+    const selectedPrice = parseFloat(
+      doctorSelect.options[doctorSelect.selectedIndex].dataset.price || 0
+    );
     document.getElementById("expected_fee").value = selectedPrice.toFixed(2);
 
     serviceContainer.innerHTML = "";
@@ -64,14 +69,21 @@ document.addEventListener("DOMContentLoaded", () => {
   serviceContainer.addEventListener("change", updateTotalFee);
 
   function updateTotalFee() {
-    const doctorFee = parseFloat(document.getElementById("expected_fee").value || 0);
-    const selectedServices = document.querySelectorAll(".service-checkbox:checked");
-    const serviceTotal = Array.from(selectedServices).reduce((sum, el) => sum + parseFloat(el.value), 0);
+    const doctorFee = parseFloat(
+      document.getElementById("expected_fee").value || 0
+    );
+    const selectedServices = document.querySelectorAll(
+      ".service-checkbox:checked"
+    );
+    const serviceTotal = Array.from(selectedServices).reduce(
+      (sum, el) => sum + parseFloat(el.value),
+      0
+    );
     const total = doctorFee + serviceTotal;
     document.getElementById("total_fee").value = total.toFixed(2);
   }
 
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", async e => {
     e.preventDefault();
 
     const doctorId = parseInt(doctorSelect.value);
@@ -80,8 +92,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const selectedServiceIds = Array.from(document.querySelectorAll(".service-checkbox:checked"))
-      .map(el => parseInt(el.dataset.id));
+    const selectedServiceIds = Array.from(
+      document.querySelectorAll(".service-checkbox:checked")
+    ).map(el => parseInt(el.dataset.id));
 
     const data = {
       first_name: document.getElementById("first_name").value.trim(),
@@ -92,7 +105,9 @@ document.addEventListener("DOMContentLoaded", () => {
       doctor_id: doctorId,
       reason: document.getElementById("reason").value.trim(),
       services: selectedServiceIds,
-      amount_paid: parseFloat(document.getElementById("total_fee").value || 0),
+      amount_paid: parseFloat(
+        document.getElementById("total_fee").value || 0
+      ),
       amount_owed: 0
     };
 
@@ -113,13 +128,24 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("✅ Bemor muvaffaqiyatli ro'yxatdan o'tdi!");
 
       const printData = {
-        receipt_number: result.id || result.turn_number || "N/A",
-        date: result.date || new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+        receipt_number:
+          result.id || result.turn_number || "N/A",
+        date:
+          result.date ||
+          new Date().toLocaleString("uz-UZ", {
+            dateStyle: "short",
+            timeStyle: "short"
+          }),
         patient_name: `${result.patient.first_name} ${result.patient.last_name}`,
         doctor_name: result.doctor_name || "Nomaʼlum",
         turn_number: result.turn_number || "N/A",
         patient_id: result.patient.id || "N/A",
-        amount: parseFloat(document.getElementById("total_fee").value || 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " so'm",
+        amount:
+          parseFloat(
+            document.getElementById("total_fee").value || 0
+          )
+            .toFixed(0)
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " so'm",
         payment_method: result.payment_method || "Naqd",
         status: result.status || "PAID",
         notes: result.reason || "Yoʻq",
@@ -132,7 +158,6 @@ document.addEventListener("DOMContentLoaded", () => {
       serviceContainer.innerHTML = "";
       document.getElementById("expected_fee").value = "";
       document.getElementById("total_fee").value = "";
-
     } catch (err) {
       console.error("❌ Error:", err.message);
       alert("❌ Xatolik: " + err.message);
@@ -142,7 +167,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function openPrintWindow(data) {
     const win = window.open("", "PrintWindow", "width=400,height=600");
 
-    // Format receipt text for QR code
     const lines = [
       "MEDSERVISE CLINIC",
       "-----------------------------",
@@ -159,8 +183,8 @@ document.addEventListener("DOMContentLoaded", () => {
       "-----------------------------",
       "Rahmat! Kuningiz yaxshi otsin!"
     ];
-    const receiptText = lines.join("\n");
-    const encodedReceipt = encodeURIComponent(receiptText);
+
+    const encodedReceipt = encodeURIComponent(lines.join("\n"));
 
     win.document.write(`
       <html lang="uz">
@@ -169,50 +193,14 @@ document.addEventListener("DOMContentLoaded", () => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Ro'yxatdan o'tish cheki</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              text-align: center;
-              margin: 20px;
-            }
-            .receipt {
-              max-width: 400px;
-              margin: 0 auto;
-              border: 1px solid #000;
-              padding: 20px;
-            }
-            .header {
-              font-size: 24px;
-              font-weight: bold;
-              margin-bottom: 20px;
-            }
-            .details {
-              text-align: left;
-              margin-bottom: 20px;
-            }
-            .details p {
-              margin: 5px 0;
-              font-size: 16px;
-            }
-            img {
-              display: block;
-              margin: 10px auto;
-              width: 100px;
-              height: 100px;
-            }
-            button {
-              padding: 10px 20px;
-              font-size: 16px;
-              cursor: pointer;
-              margin: 5px;
-            }
-            @media print {
-              button {
-                display: none;
-              }
-              @page {
-                margin: 0;
-              }
-            }
+            body { font-family: Arial, sans-serif; text-align:center; margin:20px; }
+            .receipt { max-width:400px; margin:0 auto; border:1px solid #000; padding:20px; }
+            .header { font-size:24px; font-weight:bold; margin-bottom:20px; }
+            .details { text-align:left; margin-bottom:20px; }
+            .details p { margin:5px 0; font-size:16px; }
+            img { display:block; margin:10px auto; width:100px; height:100px; }
+            button { padding:10px 20px; font-size:16px; cursor:pointer; margin:5px; }
+            @media print { button { display:none; } @page { margin:0; } }
           </style>
         </head>
         <body>
@@ -223,24 +211,21 @@ document.addEventListener("DOMContentLoaded", () => {
               <p><strong>Sana:</strong> ${data.date}</p>
               <p><strong>Bemor ismi:</strong> ${data.patient_name}</p>
               <p><strong>Shifokor ismi:</strong> ${data.doctor_name}</p>
-              <p><strong>Navbat raqami:</strong> <span style="font-size: 20px; font-weight: bold;">${data.turn_number}</span></p>
+              <p><strong>Navbat raqami:</strong> <span style="font-size:20px; font-weight:bold;">${data.turn_number}</span></p>
               <p><strong>Summa:</strong> ${data.amount}</p>
               <p><strong>To'lov usuli:</strong> ${data.payment_method}</p>
               <p><strong>Holat:</strong> ${data.status}</p>
               <p><strong>Izoh:</strong> ${data.notes}</p>
               <p><strong>Qabul qilgan:</strong> ${data.processed_by}</p>
             </div>
-            <img id="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?data=${encodedReceipt}&size=100x100" alt="QR Code">
+            <img id="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?data=${encodedReceipt}&size=100x100">
             <button onclick="window.print()">Chop etish</button>
             <button onclick="window.close()">Yopish</button>
           </div>
           <script>
             window.onload = () => {
               window.focus();
-              setTimeout(() => {
-                window.print();
-                window.onafterprint = () => window.close();
-              }, 600);
+              setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 600);
             };
           </script>
         </body>
